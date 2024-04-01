@@ -101,7 +101,7 @@
       when: ansible_distribution in ["Debian", "Ubuntu"]
       become: true
 
-    - name: Install stow with alpine
+    - name: Install needed packages with alpine
       community.general.apk:
         name: "{{ item }}"
         state: latest
