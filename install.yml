@@ -1,0 +1,113 @@
+####
+
+#### Generic playbook for provisioning pet systems, mostly desktops.
+
+####
+- name: Set up for provisioning
+  hosts: pets
+  gather_facts: true
+  remote_user: micah
+
+  vars:
+    dots: ~/dotfiles
+    pkgs:
+      - vim 
+      - tmux
+      - zsh 
+      - htop
+
+  pre_tasks:
+    - name: Update cache on debian 
+      apt:
+        update_cache: true
+      when: ansible_distribution in ["Debian", "Ubuntu"]
+      become: true
+
+    - name: Install git (debuntu)
+      apt: 
+        name: git
+        state: latest
+      become: true
+      when: ansible_distribution in ["Debian", "Ubuntu"]
+
+    - name: Install git (fedora)
+      dnf: 
+        name: git
+        state: latest
+      become: true
+      when: ansible_distribution in ["Fedora"]
+
+    - name: Install git (alpine)
+      community.general.apk: 
+        name: git
+        state: latest
+      become: true
+      when: ansible_distribution in ["Alpine"]
+
+  tasks:
+    - name: Install dotfiles
+      git:
+        repo: 'https://github.com/eye-micah/dotfiles.git'
+        dest: "{{ dots }}"
+        track_submodules: false
+        force: true
+        version: main
+
+    - name: Install stow with fedora
+      dnf:
+        name: stow
+        state: latest
+      when: ansible_distribution == "Fedora"
+      become: true
+
+    - name: Install stow with debuntu
+      apt:
+        name: stow
+        state: latest
+      when: ansible_distribution in ["Debian", "Ubuntu"]
+      become: true
+
+    - name: Install stow with alpine
+      community.general.apk:
+        name: stow
+        state: latest
+      when: ansible_distribution == "Alpine"
+      become: true
+
+    - name: Provision dotfiles using stow symlinks
+      shell: |
+        cd  {{ dots }}
+        stow -t ~ --adopt vim
+        stow -t ~ --adopt zsh
+        stow -t ~ --adopt bash
+      register: result
+      changed_when: 'result.stderr is search("LINK: ")'
+
+    - name: Install needed packages with fedora
+      dnf:
+        name: "{{ item }}"
+        state: latest
+      loop:
+        - "{{ pkgs }}"
+      when: ansible_distribution == "Fedora"
+      become: true
+
+    - name: Install needed packages with debuntu
+      apt:
+        name: "{{ item }}"
+        state: latest
+      loop:
+        - "{{ pkgs }}"
+      when: ansible_distribution in ["Debian", "Ubuntu"]
+      become: true
+
+    - name: Install stow with alpine
+      community.general.apk:
+        name: "{{ item }}"
+        state: latest
+      loop:
+        - "{{ pkgs }}"
+      when: ansible_distribution == "Alpine"
+      become: true
+
+    
